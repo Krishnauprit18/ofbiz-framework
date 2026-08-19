@@ -165,7 +165,9 @@ public class ServiceMultiEventHandler implements EventHandler {
             if (eventGlobalTransaction) {
                 // start the global transaction
                 try {
-                    beganTrans = TransactionUtil.begin(modelService.getTransactionTimeout() * rowCount);
+                    long globalTransactionTimeout = Math.min(
+                            (long) modelService.getTransactionTimeout() * rowCount, Integer.MAX_VALUE);
+                    beganTrans = TransactionUtil.begin((int) globalTransactionTimeout);
                 } catch (GenericTransactionException e) {
                     throw new EventHandlerException("Problem starting multi-service global transaction", e);
                 }

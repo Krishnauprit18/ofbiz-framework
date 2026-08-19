@@ -107,6 +107,12 @@ public final class UtilHttp {
     private static final int MULTI_ROW_DELIMITER_LENGTH = MULTI_ROW_DELIMITER.length();
     private static final int ROW_SUBMIT_PREFIX_LENGTH = ROW_SUBMIT_PREFIX.length();
 
+    // The row index in a multi form submission comes from client-supplied parameter names
+    // with no inherent limit, so a maximum is enforced here to bound the number of rows a
+    // single request can cause to be processed.
+    private static final int MAX_MULTI_FORM_ROWS =
+            UtilProperties.getPropertyAsInteger("general", "multiform.max.rows", 1000);
+
     private static final String SESSION_KEY_TIMEZONE = "timeZone";
     private static final String SESSION_KEY_THEME = "visualTheme";
 
@@ -1690,13 +1696,30 @@ public final class UtilHttp {
         }
         if (UtilValidate.isNotEmpty(maxRowIndex)) {
             try {
-                rowCount = Integer.parseInt(maxRowIndex);
-                rowCount++; // row indexes are zero based
+                // parse with a long first: a very large or negative suffix must be clamped
+                // below, not wrapped or truncated by int parsing/overflow
+                long parsedRowIndex = Long.parseLong(maxRowIndex);
+                long computedRowCount = parsedRowIndex + 1; // row indexes are zero based
+                if (computedRowCount > MAX_MULTI_FORM_ROWS) {
+                    Debug.logWarning("Multi form row count " + computedRowCount + " exceeds the maximum "
+                            + MAX_MULTI_FORM_ROWS + " allowed by the general.properties "
+                            + "multiform.max.rows setting, clamping to it", MODULE);
+                    computedRowCount = MAX_MULTI_FORM_ROWS;
+                }
+                rowCount = (int) computedRowCount;
             } catch (NumberFormatException e) {
                 Debug.logWarning("Invalid value for row index found: " + maxRowIndex, MODULE);
             }
         }
         return rowCount;
+    }
+
+    /**
+     * Returns the maximum number of rows a multi form submission is allowed to have,
+     * as configured by the general.properties multiform.max.rows setting.
+     */
+    public static int getMaxMultiFormRowCount() {
+        return MAX_MULTI_FORM_ROWS;
     }
 
     public static String stashParameterMap(HttpServletRequest request) {
