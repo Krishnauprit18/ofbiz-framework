@@ -132,6 +132,12 @@ public class ContextFilter implements Filter {
                 String tenantId = null;
                 if (UtilValidate.isNotEmpty(tenantDomainName)) {
                     tenantId = tenantDomainName.getString("tenantId");
+                    // This request's hostname is mapped to a specific tenant, so that tenant is the only one
+                    // this request may authenticate against. Recorded separately from the generic userTenantId
+                    // attribute/parameter below (which callers, including a login form's own field, can set),
+                    // since those are not trustworthy the way a hostname-to-tenant mapping we just looked up
+                    // ourselves is. LoginWorker checks this to refuse a login that names a different tenant.
+                    httpRequest.setAttribute("hostMappedTenantId", tenantId);
                 }
                 if (UtilValidate.isEmpty(tenantId)) {
                     tenantId = (String) httpRequest.getAttribute("userTenantId");

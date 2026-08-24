@@ -894,4 +894,7 @@
         <value xml:lang="zh">将重新启用 ${reEnableTime}。</value>
         <value xml:lang="zh-TW">將重新啟用 ${reEnableTime}.</value>
     </property>
+    <property key="loginevents.tenant_mismatch">
+        <value xml:lang="en">Cannot log in to a different tenant than the one associated with this address.</value>
+    </property>
 </resource>

@@ -462,6 +462,20 @@ public final class LoginWorker {
         if (UtilValidate.isEmpty(tenantId)) {
             tenantId = (String) request.getAttribute("userTenantId");
         }
+
+        // ContextFilter sets this only when it resolved the tenant from the request's hostname via
+        // TenantDomainName, which the caller cannot influence. If that trusted tenant disagrees with
+        // whatever tenantId was resolved above (which, unlike this one, can come from a request
+        // parameter), refuse to authenticate against the mismatched tenant rather than letting a caller
+        // use a mapped hostname to sign in to a different tenant than the one it is mapped to.
+        String hostMappedTenantId = (String) request.getAttribute("hostMappedTenantId");
+        if (UtilValidate.isNotEmpty(hostMappedTenantId) && !hostMappedTenantId.equals(tenantId)) {
+            String errMsg = UtilProperties.getMessage(RESOURCE, "loginevents.tenant_mismatch", UtilHttp.getLocale(request));
+            request.setAttribute("_ERROR_MESSAGE_", errMsg);
+            Debug.logWarning("Rejected login for username [%s]: requested tenant [%s] does not match the tenant"
+                    + " [%s] mapped to this request's hostname", MODULE, username, tenantId, hostMappedTenantId);
+            return "error";
+        }
         if (UtilValidate.isNotEmpty(tenantId)) {
             // see if we need to activate a tenant delegator, only do if the current delegatorName has a hash symbol in it,
             // and if the passed in tenantId doesn't match the one in the delegatorName
