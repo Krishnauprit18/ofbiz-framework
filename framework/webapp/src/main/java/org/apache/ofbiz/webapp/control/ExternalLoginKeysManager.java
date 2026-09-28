@@ -33,6 +33,7 @@ import org.apache.ofbiz.entity.Delegator;
 import org.apache.ofbiz.entity.DelegatorFactory;
 import org.apache.ofbiz.entity.GenericValue;
 import org.apache.ofbiz.entity.util.EntityUtilProperties;
+import org.apache.ofbiz.security.login.MfaServices;
 import org.apache.ofbiz.service.LocalDispatcher;
 import org.apache.ofbiz.webapp.WebAppUtil;
 
@@ -76,9 +77,20 @@ public class ExternalLoginKeysManager {
         // into the *same* webapp twice, which is the actual replay this ticket must prevent.
         private final Set<String> redeemedContextPaths = ConcurrentHashMap.newKeySet();
 
+        private final Long mfaVerifiedAt;
+
         ExternalLoginTicket(GenericValue userLogin) {
+            this(userLogin, null);
+        }
+
+        ExternalLoginTicket(GenericValue userLogin, Long mfaVerifiedAt) {
             this.userLogin = userLogin;
+            this.mfaVerifiedAt = mfaVerifiedAt;
             this.expiresAtMillis = System.currentTimeMillis() + EXTERNAL_LOGIN_KEY_TTL_MILLIS;
+        }
+
+        Long getMfaVerifiedAt() {
+            return mfaVerifiedAt;
         }
 
         GenericValue getUserLogin() {
@@ -145,7 +157,9 @@ public class ExternalLoginKeysManager {
 
             request.setAttribute(EXTERNAL_LOGIN_KEY_ATTR, externalKey);
             session.setAttribute(EXTERNAL_LOGIN_KEY_ATTR, externalKey);
-            EXTERNAL_LOGIN_KEYS.put(externalKey, new ExternalLoginTicket(userLogin));
+            Object mfaVerifiedObj = session.getAttribute(MfaServices.MFA_VERIFIED_AT);
+            Long mfaVerifiedAt = (mfaVerifiedObj instanceof Number) ? ((Number) mfaVerifiedObj).longValue() : null;
+            EXTERNAL_LOGIN_KEYS.put(externalKey, new ExternalLoginTicket(userLogin, mfaVerifiedAt));
             return externalKey;
         }
     }
@@ -284,6 +298,9 @@ public class ExternalLoginKeysManager {
         }
 
         LoginWorker.doBasicLogin(userLogin, request, response);
+        if (ticket.getMfaVerifiedAt() != null) {
+            request.getSession().setAttribute(MfaServices.MFA_VERIFIED_AT, ticket.getMfaVerifiedAt());
+        }
 
         // Create a secured cookie with the correct userLoginId
         LoginWorker.createSecuredLoginIdCookie(request, response);
